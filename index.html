@@ -8,272 +8,467 @@
   <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
       background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
       min-height: 100vh;
-      padding: 40px 20px 60px;
+      padding: 40px 20px 80px;
       color: #fff;
     }
 
-    header {
-      text-align: center;
-      margin-bottom: 48px;
-    }
-
+    header { text-align: center; margin-bottom: 48px; }
     header h1 {
-      font-size: 2.2rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
+      font-size: 2.2rem; font-weight: 700; letter-spacing: 0.12em;
       background: linear-gradient(90deg, #f0c040, #ffffff, #a0d8ef);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
       margin-bottom: 10px;
     }
+    header p { font-size: 0.95rem; color: rgba(255,255,255,0.55); letter-spacing: 0.06em; }
 
-    header p {
-      font-size: 0.95rem;
-      color: rgba(255,255,255,0.55);
-      letter-spacing: 0.06em;
+    /* ---- 編集モードトグル ---- */
+    .toolbar {
+      display: flex; justify-content: center; gap: 12px;
+      margin-bottom: 32px; flex-wrap: wrap;
     }
+    .btn {
+      padding: 10px 22px; border-radius: 30px; border: none; cursor: pointer;
+      font-size: 0.88rem; font-weight: 600; letter-spacing: 0.05em;
+      transition: all 0.2s ease;
+    }
+    .btn-edit {
+      background: rgba(255,255,255,0.12); color: #fff;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    .btn-edit:hover { background: rgba(255,255,255,0.22); }
+    .btn-edit.active {
+      background: linear-gradient(135deg, #6B21A8, #3B82F6);
+      border-color: transparent; box-shadow: 0 4px 15px rgba(107,33,168,0.5);
+    }
+    .btn-add {
+      background: linear-gradient(135deg, #059669, #10B981);
+      color: #fff; border: none;
+      box-shadow: 0 4px 15px rgba(16,185,129,0.35);
+      display: none;
+    }
+    .btn-add:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16,185,129,0.5); }
+    .edit-mode .btn-add { display: inline-block; }
 
+    /* ---- グリッド ---- */
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 28px;
-      max-width: 1100px;
-      margin: 0 auto;
+      gap: 28px; max-width: 1100px; margin: 0 auto;
     }
 
+    /* ---- カード ---- */
     .card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      background: rgba(255, 255, 255, 0.07);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
-      padding: 24px 16px 20px;
-      text-decoration: none;
-      color: #fff;
+      position: relative;
+      display: flex; flex-direction: column; align-items: center;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px; padding: 24px 16px 20px;
+      text-decoration: none; color: #fff;
       transition: transform 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
-      cursor: pointer;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      user-select: none;
     }
-
-    .card:hover {
+    .card:not(.edit-mode .card):hover {
       transform: translateY(-6px) scale(1.03);
-      background: rgba(255, 255, 255, 0.14);
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(160, 216, 239, 0.2);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255,255,255,0.14);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4), 0 0 20px rgba(160,216,239,0.2);
+      border-color: rgba(255,255,255,0.3);
     }
 
-    .card:active {
-      transform: translateY(-2px) scale(1.01);
+    /* 編集モード中のカードスタイル */
+    .edit-mode .card {
+      cursor: grab; border: 1.5px dashed rgba(255,255,255,0.35);
     }
+    .edit-mode .card:active { cursor: grabbing; }
+    .edit-mode .card.dragging {
+      opacity: 0.4; transform: scale(0.97);
+      box-shadow: 0 0 0 2px #6B21A8;
+    }
+    .edit-mode .card.drag-over {
+      border-color: #3B82F6;
+      box-shadow: 0 0 0 2px #3B82F6, 0 8px 30px rgba(59,130,246,0.4);
+      background: rgba(59,130,246,0.12);
+    }
+
+    /* ドラッグハンドル */
+    .drag-handle {
+      display: none; position: absolute; top: 8px; left: 10px;
+      color: rgba(255,255,255,0.4); font-size: 1rem; cursor: grab;
+    }
+    .edit-mode .drag-handle { display: block; }
+
+    /* 削除ボタン */
+    .btn-delete {
+      display: none; position: absolute; top: 6px; right: 8px;
+      width: 24px; height: 24px; border-radius: 50%; border: none;
+      background: rgba(239,68,68,0.8); color: #fff;
+      font-size: 0.8rem; cursor: pointer; line-height: 24px; text-align: center;
+      transition: background 0.2s;
+    }
+    .btn-delete:hover { background: #ef4444; }
+    .edit-mode .btn-delete { display: block; }
 
     .icon-wrap {
-      width: 110px;
-      height: 110px;
-      border-radius: 24px;
-      overflow: hidden;
-      margin-bottom: 16px;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
-      flex-shrink: 0;
+      width: 110px; height: 110px; border-radius: 24px; overflow: hidden;
+      margin-bottom: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.35); flex-shrink: 0;
+    }
+    .icon-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+    /* アイコンなしのプレースホルダー */
+    .icon-placeholder {
+      width: 110px; height: 110px; border-radius: 24px;
+      margin-bottom: 16px; background: rgba(255,255,255,0.08);
+      border: 2px dashed rgba(255,255,255,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; color: rgba(255,255,255,0.3);
     }
 
-    .icon-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
+    .card-label { font-size: 0.88rem; font-weight: 600; text-align: center; line-height: 1.45; letter-spacing: 0.04em; color: rgba(255,255,255,0.92); }
+    .card-badge { margin-top: 8px; font-size: 0.7rem; padding: 3px 10px; border-radius: 20px; font-weight: 500; letter-spacing: 0.05em; }
+    .badge-claude { background: rgba(210,140,80,0.25); color: #f0b97a; border: 1px solid rgba(210,140,80,0.4); }
+    .badge-gpt    { background: rgba(16,163,127,0.2);  color: #5ce0b8; border: 1px solid rgba(16,163,127,0.35); }
+    .badge-gemini { background: rgba(66,133,244,0.2);  color: #7ab8ff; border: 1px solid rgba(66,133,244,0.35); }
+    .badge-other  { background: rgba(168,85,247,0.2);  color: #d8b4fe; border: 1px solid rgba(168,85,247,0.35); }
+
+    /* ---- モーダル ---- */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: linear-gradient(145deg, #1e1b4b, #312e81);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px; padding: 32px; width: 90%; max-width: 460px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    }
+    .modal h2 { font-size: 1.3rem; margin-bottom: 24px; letter-spacing: 0.06em; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-bottom: 6px; letter-spacing: 0.04em; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 10px 14px; border-radius: 10px;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
+      color: #fff; font-size: 0.9rem; outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus { border-color: #6B21A8; }
+    .form-group select option { background: #1e1b4b; }
+    .form-group input::placeholder { color: rgba(255,255,255,0.3); }
+
+    /* アイコンURL プレビュー */
+    .icon-preview-wrap { display: flex; align-items: center; gap: 12px; }
+    .icon-preview-wrap input { flex: 1; }
+    #iconPreview {
+      width: 52px; height: 52px; border-radius: 12px; object-fit: cover;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      display: none;
     }
 
-    .card-label {
-      font-size: 0.88rem;
-      font-weight: 600;
-      text-align: center;
-      line-height: 1.45;
-      letter-spacing: 0.04em;
-      color: rgba(255,255,255,0.92);
-    }
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+    .btn-cancel { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+    .btn-cancel:hover { background: rgba(255,255,255,0.18); }
+    .btn-save { background: linear-gradient(135deg, #6B21A8, #3B82F6); color: #fff; border: none; box-shadow: 0 4px 15px rgba(107,33,168,0.4); }
+    .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(107,33,168,0.55); }
 
-    .card-badge {
-      margin-top: 8px;
-      font-size: 0.7rem;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-weight: 500;
-      letter-spacing: 0.05em;
-    }
-
-    .badge-claude {
-      background: rgba(210, 140, 80, 0.25);
-      color: #f0b97a;
-      border: 1px solid rgba(210, 140, 80, 0.4);
-    }
-
-    .badge-gpt {
-      background: rgba(16, 163, 127, 0.2);
-      color: #5ce0b8;
-      border: 1px solid rgba(16, 163, 127, 0.35);
-    }
-
-    .badge-gemini {
-      background: rgba(66, 133, 244, 0.2);
-      color: #7ab8ff;
-      border: 1px solid rgba(66, 133, 244, 0.35);
-    }
-
-    footer {
-      text-align: center;
-      margin-top: 56px;
-      font-size: 0.78rem;
-      color: rgba(255,255,255,0.3);
-      letter-spacing: 0.05em;
-    }
+    footer { text-align: center; margin-top: 56px; font-size: 0.78rem; color: rgba(255,255,255,0.3); letter-spacing: 0.05em; }
 
     @media (max-width: 600px) {
       header h1 { font-size: 1.6rem; }
       .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px; }
-      .icon-wrap { width: 88px; height: 88px; }
+      .icon-wrap, .icon-placeholder { width: 88px; height: 88px; }
       .card-label { font-size: 0.8rem; }
     }
   </style>
 </head>
 <body>
 
-  <header>
-    <h1>秘書一覧</h1>
-    <p>AIアシスタント &amp; ツール集</p>
-  </header>
+<header>
+  <h1>秘書一覧</h1>
+  <p>AIアシスタント &amp; ツール集</p>
+</header>
 
-  <div class="grid">
+<div class="toolbar">
+  <button class="btn btn-edit" id="editToggle" onclick="toggleEditMode()">✏️ 編集モード</button>
+  <button class="btn btn-add" onclick="openModal()">＋ カードを追加</button>
+</div>
 
-    <a class="card" href="https://claude.ai/project/01985d50-9c32-735d-a807-87d2dc2c216e" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/my_diary_icon.png" alt="私の日記">
+<div class="grid" id="grid"></div>
+
+<footer>
+  <p>&copy; 2025 秘書一覧 &mdash; AI Assistant Collection</p>
+</footer>
+
+<!-- 追加モーダル -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>カードを追加</h2>
+    <div class="form-group">
+      <label>ラベル（表示名）</label>
+      <input type="text" id="inputLabel" placeholder="例: 私の日記">
+    </div>
+    <div class="form-group">
+      <label>リンクURL</label>
+      <input type="url" id="inputUrl" placeholder="https://...">
+    </div>
+    <div class="form-group">
+      <label>アイコン画像URL（任意）</label>
+      <div class="icon-preview-wrap">
+        <input type="url" id="inputIcon" placeholder="https://... または空白" oninput="previewIcon(this.value)">
+        <img id="iconPreview" src="" alt="preview">
       </div>
-      <span class="card-label">私の日記</span>
-      <span class="card-badge badge-claude">Claude</span>
-    </a>
-
-    <a class="card" href="https://chatgpt.com/g/g-6994d71acfe081918ba1320764190c6d-ge-ci-nozuo-cheng" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/suno_lyrics_icon.png" alt="suno用歌詞作成">
-      </div>
-      <span class="card-label">suno用歌詞作成</span>
-      <span class="card-badge badge-gpt">GPT</span>
-    </a>
-
-    <a class="card" href="https://chatgpt.com/g/g-698ad5087d84819185764f4505741752-ban-ben-sankuron" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/sakamoto_gpt_icon.png" alt="阪本さんGPT">
-      </div>
-      <span class="card-label">阪本さんGPT</span>
-      <span class="card-badge badge-gpt">GPT</span>
-    </a>
-
-    <a class="card" href="https://chatgpt.com/g/g-6961b603a264819180f5d9dcbb208d4d-ren-sheng-atohaisu" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/life_advice_icon.png" alt="人生のアドバイス">
-      </div>
-      <span class="card-label">人生のアドバイス</span>
-      <span class="card-badge badge-gpt">GPT</span>
-    </a>
-
-    <a class="card" href="https://chatgpt.com/g/g-6869c2abee9c819190339a46082df665-aimanesiya" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/ai_manager_icon.png" alt="AIマネージャー">
-      </div>
-      <span class="card-label">AIマネージャー</span>
-      <span class="card-badge badge-gpt">GPT</span>
-    </a>
-
-    <a class="card" href="https://chatgpt.com/g/g-68ff0ec3ff148191a27fd887a703d2f2-1on1" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/ai_one_on_one_icon.png" alt="AIワンオンワン">
-      </div>
-      <span class="card-label">AIワンオンワン</span>
-      <span class="card-badge badge-gpt">GPT</span>
-    </a>
-
-    <a class="card" href="https://chatgpt.com/g/g-ySIeXM2tJ-mi-shu" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/gpt_secretary_icon.png" alt="GPT秘書">
-      </div>
-      <span class="card-label">GPT秘書</span>
-      <span class="card-badge badge-gpt">GPT</span>
-    </a>
-
-    <a class="card" href="https://gemini.google.com/gem/17kvc_ZpLyvO6cgl_s1BHmi5RjxY7LIQk?usp=sharing" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/schedule_icon.png" alt="スケジュール管理">
-      </div>
-      <span class="card-label">スケジュール管理</span>
-      <span class="card-badge badge-gemini">Gemini</span>
-    </a>
-
-    <a class="card" href="https://gemini.google.com/gem/1sSi4ukUxdpzeQbhvHrEfT-E6jtTugQ8l?usp=sharing" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/yamada_clone_icon.png" alt="山田クローン">
-      </div>
-      <span class="card-label">山田クローン</span>
-      <span class="card-badge badge-gemini">Gemini</span>
-    </a>
-
-    <a class="card" href="https://gemini.google.com/gem/1zRzTPuAY-PHioymW-M9RuCWs5Kal0ll8?usp=sharing" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/writing_icon.png" alt="文章作成">
-      </div>
-      <span class="card-label">文章作成</span>
-      <span class="card-badge badge-gemini">Gemini</span>
-    </a>
-
-    <a class="card" href="https://gemini.google.com/gem/1zRzTPuAY-PHioymW-M9RuCWs5Kal0ll8?usp=sharing" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/manga_icon.png" alt="漫画作成">
-      </div>
-      <span class="card-label">漫画作成</span>
-      <span class="card-badge badge-gemini">Gemini</span>
-    </a>
-
-    <a class="card" href="https://gemini.google.com/gem/1jm_JonXv0wUYJRjVfqS3Hi4X-sMABZdK?usp=sharing" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/business_consulting_icon.png" alt="経営相談">
-      </div>
-      <span class="card-label">経営相談</span>
-      <span class="card-badge badge-gemini">Gemini</span>
-    </a>
-
-    <a class="card" href="https://gemini.google.com/gem/1MGJp_OzhpZM_QywD9rPKVQ7uSUKzADaw?usp=sharing" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/insurance_diagnosis_icon.png" alt="法人・必要保障額診断">
-      </div>
-      <span class="card-label">法人・必要保障額診断</span>
-      <span class="card-badge badge-gemini">Gemini</span>
-    </a>
-
-    <a class="card" href="https://gemini.google.com/gem/storybook" target="_blank" rel="noopener noreferrer">
-      <div class="icon-wrap">
-        <img src="icons/picture_book_icon.png" alt="絵本作成">
-      </div>
-      <span class="card-label">絵本作成</span>
-      <span class="card-badge badge-gemini">Gemini</span>
-    </a>
-
+    </div>
+    <div class="form-group">
+      <label>バッジ種別</label>
+      <select id="inputBadge">
+        <option value="gpt">GPT</option>
+        <option value="gemini">Gemini</option>
+        <option value="claude">Claude</option>
+        <option value="other">その他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>バッジテキスト（任意）</label>
+      <input type="text" id="inputBadgeText" placeholder="例: GPT（空白でバッジ種別を使用）">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-save" onclick="addCard()">追加する</button>
+    </div>
   </div>
+</div>
 
-  <footer>
-    <p>&copy; 2025 秘書一覧 &mdash; AI Assistant Collection</p>
-  </footer>
+<script>
+  // ---- 初期データ ----
+  const DEFAULT_CARDS = [
+    { label: '私の日記',           url: 'https://claude.ai/project/01985d50-9c32-735d-a807-87d2dc2c216e',                                              icon: 'icons/my_diary_icon.png',              badge: 'claude',  badgeText: 'Claude'  },
+    { label: 'suno用歌詞作成',     url: 'https://chatgpt.com/g/g-6994d71acfe081918ba1320764190c6d-ge-ci-nozuo-cheng',                                  icon: 'icons/suno_lyrics_icon.png',           badge: 'gpt',     badgeText: 'GPT'     },
+    { label: '阪本さんGPT',        url: 'https://chatgpt.com/g/g-698ad5087d84819185764f4505741752-ban-ben-sankuron',                                    icon: 'icons/sakamoto_gpt_icon.png',          badge: 'gpt',     badgeText: 'GPT'     },
+    { label: '人生のアドバイス',   url: 'https://chatgpt.com/g/g-6961b603a264819180f5d9dcbb208d4d-ren-sheng-atohaisu',                                  icon: 'icons/life_advice_icon.png',           badge: 'gpt',     badgeText: 'GPT'     },
+    { label: 'AIマネージャー',     url: 'https://chatgpt.com/g/g-6869c2abee9c819190339a46082df665-aimanesiya',                                          icon: 'icons/ai_manager_icon.png',            badge: 'gpt',     badgeText: 'GPT'     },
+    { label: 'AIワンオンワン',     url: 'https://chatgpt.com/g/g-68ff0ec3ff148191a27fd887a703d2f2-1on1',                                               icon: 'icons/ai_one_on_one_icon.png',         badge: 'gpt',     badgeText: 'GPT'     },
+    { label: 'GPT秘書',            url: 'https://chatgpt.com/g/g-ySIeXM2tJ-mi-shu',                                                                    icon: 'icons/gpt_secretary_icon.png',         badge: 'gpt',     badgeText: 'GPT'     },
+    { label: 'スケジュール管理',   url: 'https://gemini.google.com/gem/17kvc_ZpLyvO6cgl_s1BHmi5RjxY7LIQk?usp=sharing',                                 icon: 'icons/schedule_icon.png',              badge: 'gemini',  badgeText: 'Gemini'  },
+    { label: '山田クローン',       url: 'https://gemini.google.com/gem/1sSi4ukUxdpzeQbhvHrEfT-E6jtTugQ8l?usp=sharing',                                 icon: 'icons/yamada_clone_icon.png',          badge: 'gemini',  badgeText: 'Gemini'  },
+    { label: '文章作成',           url: 'https://gemini.google.com/gem/1zRzTPuAY-PHioymW-M9RuCWs5Kal0ll8?usp=sharing',                                 icon: 'icons/writing_icon.png',               badge: 'gemini',  badgeText: 'Gemini'  },
+    { label: '漫画作成',           url: 'https://gemini.google.com/gem/1zRzTPuAY-PHioymW-M9RuCWs5Kal0ll8?usp=sharing',                                 icon: 'icons/manga_icon.png',                 badge: 'gemini',  badgeText: 'Gemini'  },
+    { label: '経営相談',           url: 'https://gemini.google.com/gem/1jm_JonXv0wUYJRjVfqS3Hi4X-sMABZdK?usp=sharing',                                 icon: 'icons/business_consulting_icon.png',   badge: 'gemini',  badgeText: 'Gemini'  },
+    { label: '法人・必要保障額診断', url: 'https://gemini.google.com/gem/1MGJp_OzhpZM_QywD9rPKVQ7uSUKzADaw?usp=sharing',                               icon: 'icons/insurance_diagnosis_icon.png',   badge: 'gemini',  badgeText: 'Gemini'  },
+    { label: '絵本作成',           url: 'https://gemini.google.com/gem/storybook',                                                                       icon: 'icons/picture_book_icon.png',          badge: 'gemini',  badgeText: 'Gemini'  },
+  ];
 
+  const STORAGE_KEY = 'hisho_cards_v1';
+  let cards = [];
+  let isEditMode = false;
+  let dragSrcIndex = null;
+
+  // ---- 初期化 ----
+  function init() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    cards = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(DEFAULT_CARDS));
+    renderGrid();
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cards));
+  }
+
+  // ---- レンダリング ----
+  function renderGrid() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    cards.forEach((c, i) => {
+      const el = createCardEl(c, i);
+      grid.appendChild(el);
+    });
+  }
+
+  function createCardEl(c, i) {
+    const a = document.createElement('a');
+    a.className = 'card';
+    a.href = isEditMode ? '#' : c.url;
+    if (!isEditMode) a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.dataset.index = i;
+
+    // ドラッグハンドル
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.textContent = '⠿';
+    a.appendChild(handle);
+
+    // 削除ボタン
+    const del = document.createElement('button');
+    del.className = 'btn-delete';
+    del.textContent = '✕';
+    del.onclick = (e) => { e.preventDefault(); e.stopPropagation(); deleteCard(i); };
+    a.appendChild(del);
+
+    // アイコン
+    if (c.icon) {
+      const wrap = document.createElement('div');
+      wrap.className = 'icon-wrap';
+      const img = document.createElement('img');
+      img.src = c.icon;
+      img.alt = c.label;
+      img.onerror = () => { wrap.remove(); const ph = makePlaceholder(); a.insertBefore(ph, a.querySelector('.card-label')); };
+      wrap.appendChild(img);
+      a.appendChild(wrap);
+    } else {
+      a.appendChild(makePlaceholder());
+    }
+
+    // ラベル
+    const label = document.createElement('span');
+    label.className = 'card-label';
+    label.textContent = c.label;
+    a.appendChild(label);
+
+    // バッジ
+    if (c.badgeText) {
+      const badge = document.createElement('span');
+      badge.className = `card-badge badge-${c.badge || 'other'}`;
+      badge.textContent = c.badgeText;
+      a.appendChild(badge);
+    }
+
+    // ドラッグイベント
+    a.draggable = true;
+    a.addEventListener('dragstart', onDragStart);
+    a.addEventListener('dragover',  onDragOver);
+    a.addEventListener('dragleave', onDragLeave);
+    a.addEventListener('drop',      onDrop);
+    a.addEventListener('dragend',   onDragEnd);
+
+    // クリック（編集モード中はリンク無効）
+    a.addEventListener('click', (e) => { if (isEditMode) e.preventDefault(); });
+
+    return a;
+  }
+
+  function makePlaceholder() {
+    const ph = document.createElement('div');
+    ph.className = 'icon-placeholder';
+    ph.textContent = '🤖';
+    return ph;
+  }
+
+  // ---- 編集モード ----
+  function toggleEditMode() {
+    isEditMode = !isEditMode;
+    document.body.classList.toggle('edit-mode', isEditMode);
+    const btn = document.getElementById('editToggle');
+    btn.classList.toggle('active', isEditMode);
+    btn.textContent = isEditMode ? '✅ 完了' : '✏️ 編集モード';
+    renderGrid();
+    if (!isEditMode) save();
+  }
+
+  // ---- ドラッグ＆ドロップ ----
+  function onDragStart(e) {
+    if (!isEditMode) return;
+    dragSrcIndex = parseInt(this.dataset.index);
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function onDragOver(e) {
+    if (!isEditMode || dragSrcIndex === null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+    this.classList.add('drag-over');
+  }
+
+  function onDragLeave() {
+    this.classList.remove('drag-over');
+  }
+
+  function onDrop(e) {
+    if (!isEditMode) return;
+    e.preventDefault();
+    const targetIndex = parseInt(this.dataset.index);
+    if (dragSrcIndex === null || dragSrcIndex === targetIndex) return;
+    const moved = cards.splice(dragSrcIndex, 1)[0];
+    cards.splice(targetIndex, 0, moved);
+    dragSrcIndex = null;
+    renderGrid();
+    save();
+  }
+
+  function onDragEnd() {
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.remove('dragging', 'drag-over');
+    });
+    dragSrcIndex = null;
+  }
+
+  // ---- 削除 ----
+  function deleteCard(i) {
+    if (!confirm(`「${cards[i].label}」を削除しますか？`)) return;
+    cards.splice(i, 1);
+    renderGrid();
+    save();
+  }
+
+  // ---- 追加モーダル ----
+  function openModal() {
+    document.getElementById('inputLabel').value = '';
+    document.getElementById('inputUrl').value = '';
+    document.getElementById('inputIcon').value = '';
+    document.getElementById('inputBadgeText').value = '';
+    document.getElementById('iconPreview').style.display = 'none';
+    document.getElementById('modalOverlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+
+  function previewIcon(url) {
+    const img = document.getElementById('iconPreview');
+    if (url) {
+      img.src = url;
+      img.style.display = 'block';
+      img.onerror = () => { img.style.display = 'none'; };
+    } else {
+      img.style.display = 'none';
+    }
+  }
+
+  function addCard() {
+    const label     = document.getElementById('inputLabel').value.trim();
+    const url       = document.getElementById('inputUrl').value.trim();
+    const icon      = document.getElementById('inputIcon').value.trim();
+    const badge     = document.getElementById('inputBadge').value;
+    const badgeText = document.getElementById('inputBadgeText').value.trim() || badge.toUpperCase();
+
+    if (!label) { alert('ラベルを入力してください'); return; }
+    if (!url)   { alert('URLを入力してください'); return; }
+
+    cards.push({ label, url, icon: icon || '', badge, badgeText });
+    save();
+    closeModal();
+    renderGrid();
+  }
+
+  // モーダル外クリックで閉じる
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Enterキーで追加
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+  });
+
+  init();
+</script>
 </body>
 </html>
